@@ -2,7 +2,8 @@
 #
 # This is a defined type for Icinga 2 apply objects that apply services to hosts.
 # See the following Icinga 2 doc page for more info:
-# http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/configuring-icinga2#objecttype-service
+# http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/configuring-icinga2#objecttype-host
+# http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/configuring-icinga2#apply
 #
 # === Parameters
 #
@@ -26,7 +27,7 @@ define icinga2::object::apply_service_to_host (
   $enable_active_checks = undef,
   $enable_passive_checks = undef,
   $enable_event_handler = undef,
-  $enable_flap_detection = undef,
+  $enable_flapping = undef,
   $enable_perfdata = undef,
   $event_command = undef,
   #flapping_threshold is defined as a percentage, eg. 10%, 50%, etc.
@@ -37,11 +38,13 @@ define icinga2::object::apply_service_to_host (
   $action_url = undef,
   $icon_image = undef,
   $icon_image_alt = undef,
-  $target_dir        = '/etc/icinga2/conf.d',
-  $target_file_name  = "${name}.conf",
-  $target_file_owner = 'root',
-  $target_file_group = 'root',
-  $target_file_mode  = '0644'
+  $target_dir         = '/etc/icinga2/conf.d',
+  $target_file_name   = "${name}.conf",
+  $target_file_ensure = file,  
+  $target_file_owner  = 'root',
+  $target_file_group  = 'root',
+  $target_file_mode   = '0644',
+  $refresh_icinga2_service = true
 ) {
 
   #Do some validation of the class' parameters:
@@ -54,15 +57,33 @@ define icinga2::object::apply_service_to_host (
   validate_string($target_file_owner)
   validate_string($target_file_group)
   validate_string($target_file_mode)
+  validate_bool($refresh_icinga2_service)
 
+  #If the refresh_icinga2_service parameter is set to true...
+  if $refresh_icinga2_service == true {
 
-  file {"${target_dir}/${target_file_name}":
-    ensure  => file,
-    owner   => $target_file_owner,
-    group   => $target_file_group,
-    mode    => $target_file_mode,
-    content => template('icinga2/object_apply_service_to_host.conf.erb'),
-    notify  => Service['icinga2'],
+    file { "${target_dir}/${target_file_name}":
+      ensure  => $target_file_ensure,
+      owner   => $target_file_owner,
+      group   => $target_file_group,
+      mode    => $target_file_mode,
+      content => template('icinga2/object_apply_service_to_host.conf.erb'),
+      #...notify the Icinga 2 daemon so it can restart and pick up changes made to this config file...
+      notify  => Service['icinga2'],
+    }
+
+  }
+  #...otherwise, use the same file resource but without a notify => parameter: 
+  else {
+  
+    file { "${target_dir}/${target_file_name}":
+      ensure  => $target_file_ensure,
+      owner   => $target_file_owner,
+      group   => $target_file_group,
+      mode    => $target_file_mode,
+      content => template('icinga2/object_apply_service_to_host.conf.erb'),
+    }
+  
   }
 
 }

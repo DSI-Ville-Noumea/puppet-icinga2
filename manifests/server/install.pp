@@ -32,9 +32,8 @@ class icinga2::server::install::repos inherits icinga2::server {
 
   if $manage_repos == true {
     case $::operatingsystem {
-      #CentOS systems:
-      'CentOS': {
-
+      #CentOS or RedHat systems:
+      'CentOS', 'RedHat': {
         #Add the official Icinga Yum repository: http://packages.icinga.org/epel/
         yumrepo { 'icinga2_yum_repo':
           baseurl  => "http://packages.icinga.org/epel/${::operatingsystemmajrelease}/release/",
@@ -45,8 +44,8 @@ class icinga2::server::install::repos inherits icinga2::server {
         }
       }
 
-      #Ubuntu systems:
-      'Ubuntu': {
+     #Ubuntu systems:
+     'Ubuntu': {
         #Include the apt module's base class so we can...
         include apt
         #...use the apt module to add the Icinga 2 PPA from launchpad.net:
@@ -56,8 +55,23 @@ class icinga2::server::install::repos inherits icinga2::server {
 
       #Debian systems:
       'Debian': {
+        include apt
+
         #On Debian (7) icinga2 packages are on backports
-        include apt::backports
+        if $use_debmon_repo == false {
+          include apt::backports
+        } else {
+          apt::source { 'debmon':
+            location    => 'http://debmon.org/debmon',
+            release     => "debmon-${lsbdistcodename}",
+            repos       => 'main',
+            key_source  => 'http://debmon.org/debmon/repo.key',
+            key         => '29D662D2',
+            include_src => false,
+            # backports repo use 200
+            pin         => '300'
+          }
+        }
       }
 
       #Fail if we're on any other OS:
@@ -81,8 +95,8 @@ class icinga2::server::install::packages inherits icinga2::server {
   if $server_install_nagios_plugins == true {
     #Install the Nagios plugins packages:
     package {$icinga2_server_plugin_packages:
-      ensure   => installed,
-      provider => $package_provider,
+      ensure          => installed,
+      provider        => $package_provider,
       install_options => $server_plugin_package_install_options,
     }
   }
@@ -90,8 +104,8 @@ class icinga2::server::install::packages inherits icinga2::server {
   if $install_mail_utils_package == true {
     #Install the package that has the 'mail' binary in it so we can send notifications:
     package {$icinga2_server_mail_package:
-      ensure   => installed,
-      provider => $package_provider,
+      ensure          => installed,
+      provider        => $package_provider,
       install_options => $server_plugin_package_install_options,
     }
   }
@@ -134,7 +148,7 @@ class icinga2::server::install::execs inherits icinga2::server {
       exec { 'mysql_module_enable':
         user    => 'root',
         path    => '/usr/bin:/usr/sbin:/bin/:/sbin',
-        command => '/usr/sbin/icinga2-enable-feature ido-mysql && touch /etc/icinga2/mysql_module_loaded.txt',
+        command => '/usr/sbin/icinga2 enable feature ido-mysql && touch /etc/icinga2/mysql_module_loaded.txt',
         creates => '/etc/icinga2/mysql_module_loaded.txt',
         require => Exec['mysql_schema_load'],
       }
@@ -145,7 +159,7 @@ class icinga2::server::install::execs inherits icinga2::server {
       exec { 'postgres_schema_load':
         user    => 'root',
         path    => '/usr/bin:/usr/sbin:/bin/:/sbin',
-        command => "su - postgres -c 'export PGPASSWORD='${db_password}' && psql -U ${db_user} -h localhost -d ${db_name} < ${server_db_schema_path}' && export PGPASSWORD='' && touch /etc/icinga2/postgres_schema_loaded.txt",
+        command => "su - postgres -c 'export PGPASSWORD='\\''${db_password}'\\'' && psql -U ${db_user} -h localhost -d ${db_name} < ${server_db_schema_path}' && export PGPASSWORD='' && touch /etc/icinga2/postgres_schema_loaded.txt",
         creates => '/etc/icinga2/postgres_schema_loaded.txt',
         require => Class['icinga2::server::install::packages'],
       }
@@ -153,7 +167,7 @@ class icinga2::server::install::execs inherits icinga2::server {
       exec { 'postgres_module_enable':
         user    => 'root',
         path    => '/usr/bin:/usr/sbin:/bin/:/sbin',
-        command => '/usr/sbin/icinga2-enable-feature ido-pgsql && touch /etc/icinga2/postgres_module_loaded.txt',
+        command => '/usr/sbin/icinga2 enable feature ido-pgsql && touch /etc/icinga2/postgres_module_loaded.txt',
         creates => '/etc/icinga2/postgres_module_loaded.txt',
         require => Exec['postgres_schema_load'],
       }
