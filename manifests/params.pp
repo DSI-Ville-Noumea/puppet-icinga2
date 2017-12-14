@@ -355,7 +355,6 @@ class icinga2::params {
 
   ##################
   # Icinga 2 client package parameters
-  $icinga2_client_packages = []
   case $::operatingsystem {
     #CentOS or RedHat systems:
     'CentOS', 'RedHat': {
